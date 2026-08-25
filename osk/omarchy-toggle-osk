@@ -1,0 +1,21 @@
+#!/bin/bash
+# Toggle the wvkbd on-screen keyboard visibility.
+STATE_FILE="/tmp/osk-visible"
+TRACKPAD_MARKER="omarchy/trackpad/shell.qml"
+
+pkill -SIGRTMIN wvkbd-deskintl
+
+if [ -f "$STATE_FILE" ]; then
+    rm -f "$STATE_FILE"
+    # Only restore hide-on-touch if the trackpad isn't also relying on it
+    # being off.
+    if ! pgrep -f "$TRACKPAD_MARKER" >/dev/null; then
+        hyprctl eval 'hl.config({ cursor = { hide_on_touch = true } })' >/dev/null
+    fi
+else
+    touch "$STATE_FILE"
+    # Don't hide the cursor on touch while typing on the OSK -- each key
+    # tap is its own touch-down/up, so hide-on-touch flickers the cursor
+    # visible/hidden on every keystroke.
+    hyprctl eval 'hl.config({ cursor = { hide_on_touch = false } })' >/dev/null
+fi

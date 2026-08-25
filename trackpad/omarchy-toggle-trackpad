@@ -1,0 +1,20 @@
+#!/bin/bash
+# Toggle the standalone virtual trackpad Quickshell instance.
+MARKER="omarchy/trackpad/shell.qml"
+OSK_STATE="/tmp/osk-visible"
+
+pid=$(pgrep -f "$MARKER")
+if [ -n "$pid" ]; then
+    kill "$pid"
+    # Only restore hide-on-touch if the OSK isn't also relying on it being off.
+    if [ ! -f "$OSK_STATE" ]; then
+        hyprctl eval 'hl.config({ cursor = { hide_on_touch = true } })' >/dev/null
+    fi
+else
+    nohup quickshell -p "$HOME/.config/omarchy/trackpad/shell.qml" \
+        >/tmp/trackpad-shell.log 2>&1 &
+    disown
+    # The trackpad drives the cursor via synthetic relative motion while
+    # you're touching the screen, which hide-on-touch fights (flicker).
+    hyprctl eval 'hl.config({ cursor = { hide_on_touch = false } })' >/dev/null
+fi

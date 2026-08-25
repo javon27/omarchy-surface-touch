@@ -1,0 +1,10 @@
+#!/bin/bash
+# Toggle whether auto-rotate follows the device's accelerometer.
+LOCK_FILE="/tmp/rotation-locked"
+if [ -f "$LOCK_FILE" ]; then
+    rm -f "$LOCK_FILE"
+    notify-send "Rotation" "Auto-rotate unlocked" 2>/dev/null
+else
+    touch "$LOCK_FILE"
+    notify-send "Rotation" "Locked to current orientation" 2>/dev/null
+fi

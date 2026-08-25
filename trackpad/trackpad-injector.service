@@ -1,0 +1,12 @@
+[Unit]
+Description=Relative-mouse injector for the virtual trackpad panel
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 __USER_HOME__/.local/bin/trackpad-injector.py
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target

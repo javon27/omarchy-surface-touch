@@ -1,0 +1,22 @@
+--- a/keyboard.c
++++ b/keyboard.c
+@@ -397,7 +397,18 @@
+             kbd_draw_key(kb, kb->last_swipe, Swipe);
+         }
+     } else {
+-        kbd_unpress_key(kb, time);
++        // Only unpress if the touch actually moved off the currently
++        // pressed key. Upstream unconditionally unpresses on every motion
++        // event, which fires almost immediately even for a perfectly
++        // steady finger (real touch sensors always report some sub-pixel
++        // jitter) -- that clears the key highlight right after it appears
++        // and cancels whatever repeat-timer state depends on "still
++        // pressed", so both the highlight and key-repeat break on any
++        // sustained hold.
++        struct key *current_key = kbd_get_key(kb, x, y);
++        if (current_key != kb->last_press) {
++            kbd_unpress_key(kb, time);
++        }
+     }
+ 
+     kbd_clear_last_popup(kb);

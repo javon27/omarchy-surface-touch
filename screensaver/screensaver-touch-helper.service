@@ -1,0 +1,11 @@
+[Unit]
+Description=Hide OSK/trackpad and enable touch-dismiss for the screensaver
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/.local/bin/screensaver-touch-helper.py
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=default.target

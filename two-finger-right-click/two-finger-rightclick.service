@@ -1,0 +1,13 @@
+[Unit]
+Description=Two-finger-tap-to-right-click on touchscreen
+After=multi-user.target
+
+[Service]
+Type=simple
+Environment=USER_XDG_RUNTIME_DIR=/run/user/__USER_UID__
+ExecStart=/usr/bin/python3 __USER_HOME__/.local/bin/two-finger-right-click.py
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target

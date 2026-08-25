@@ -1,0 +1,11 @@
+[Unit]
+Description=Auto-rotate display + touchscreen to match device orientation
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/auto-rotate.sh
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=default.target
