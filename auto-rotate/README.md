@@ -7,7 +7,7 @@ down doesn't flash-rotate through every orientation in between.
 ## Prerequisite: find your values
 
 `auto-rotate.sh` hardcodes three things at the top of the file that are
-specific to the exact machine it was written on (a Surface Pro 7):
+specific to the exact machine it was written on (a Surface Pro 7+):
 
 ```bash
 MONITOR="eDP-1"

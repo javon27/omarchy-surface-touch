@@ -1,7 +1,7 @@
 # omarchy-surface-touch
 
 Touch-input support for [Omarchy](https://omarchy.org/) on a Surface-family
-tablet (built and tested on a **Surface Pro 7**, but see
+tablet (built and tested on a **Surface Pro 7+**, but see
 [Hardware compatibility](#hardware-compatibility) below) -- everything
 needed to use one with the keyboard detached: an on-screen keyboard that
 doesn't flicker, a virtual trackpad for precise cursor control, two-finger
@@ -9,7 +9,7 @@ right-click, a touch-friendly lock screen with a PIN pad, auto-rotate, and a
 touch-dismissible screensaver.
 
 None of this ships with Omarchy or linux-surface out of the box. It's the
-result of a long trial-and-error session getting a Surface Pro 7 fully
+result of a long trial-and-error session getting a Surface Pro 7+ fully
 usable as a tablet under Omarchy, written up so nobody else has to repeat
 that from scratch.
 
@@ -33,8 +33,11 @@ plan to use the trackpad panel yourself.
 
 ## Hardware compatibility
 
-Written and tested on a **Surface Pro 7** running Omarchy 4.x (Arch +
-Hyprland) with the linux-surface kernel. Device-specific values you'll need
+Written and tested on a **Surface Pro 7+** (the commercial/LTE SKU sold
+through channels like Costco -- same chassis and panel as the regular
+Surface Pro 7, different internals) running Omarchy 4.x (Arch + Hyprland)
+with the linux-surface kernel. Nothing here is 7+-specific; a plain Surface
+Pro 7 should need the exact same setup. Device-specific values you'll need
 to adjust for other hardware are called out in each component's README --
 in short:
 
@@ -81,7 +84,7 @@ to user scope.
 Found this useful on a different Surface model, or fixed something? PRs
 welcome -- especially device-specific values for other hardware (add them to
 the relevant README's table rather than changing the defaults, so the
-Surface Pro 7 configuration keeps working for people who copy-paste without
+Surface Pro 7+ configuration keeps working for people who copy-paste without
 reading closely).
 
 ## License

@@ -42,7 +42,7 @@ two-finger-rightclick.service`, add under `[Service]`):
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `TOUCH_DEVICE_NAME` | `IPTSD Virtual Touchscreen 045E:0C1A` | Run `sudo libinput list-devices` or `evtest` to find yours if you're not on a Surface Pro 7 |
+| `TOUCH_DEVICE_NAME` | `IPTSD Virtual Touchscreen 045E:0C1A` | Run `sudo libinput list-devices` or `evtest` to find yours if you're not on a Surface Pro 7+ |
 | `TAP_MAX_DURATION_MS` | `350` | Longest a two-finger touch can last and still count as a tap |
 | `SECOND_FINGER_WINDOW_MS` | `150` | How close together the two touch-downs must land in time |
 | `MOVE_FUZZ_PERCENT` | `3.0` | How much either finger may drift (as % of the axis range) before the gesture aborts as a drag/pinch instead |

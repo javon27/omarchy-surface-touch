@@ -31,7 +31,7 @@ Esc, arrows, no numpad), `special` adds a symbols/numpad layer accessible
 via the keyboard's own layer-switch key.
 
 The height that looks right depends on your screen's DPI and how big your
-fingers need the keys to be -- 470px is what worked well on a Surface Pro 7's
+fingers need the keys to be -- 470px is what worked well on a Surface Pro 7+'s
 2736x1824 panel at 1.6x scale. Start there and adjust up/down in ~30px steps.
 
 To change flags after install, edit the `o.launch_on_start(...)` line in
