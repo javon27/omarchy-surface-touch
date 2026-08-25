@@ -53,7 +53,7 @@ an accelerometer.
 ## Quick start
 
 ```bash
-git clone https://github.com/<you>/omarchy-surface-touch.git
+git clone https://github.com/javon27/omarchy-surface-touch.git
 cd omarchy-surface-touch
 ./install.sh          # interactive menu
 ./install.sh --all    # everything, no prompts
