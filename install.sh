@@ -10,7 +10,7 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
-COMPONENTS=(kernel osk trackpad two-finger-right-click auto-rotate screensaver lock-pin)
+COMPONENTS=(kernel osk trackpad two-finger-right-click auto-rotate screensaver lock-pin touchpad-mt-fix)
 
 run_component() {
   case "$1" in
@@ -21,6 +21,7 @@ run_component() {
     auto-rotate) bash auto-rotate/install.sh ;;
     screensaver) bash screensaver/install.sh ;;
     lock-pin) bash lock-pin/install.sh ;;
+    touchpad-mt-fix) bash touchpad-mt-fix/install.sh ;;
     *) echo "Unknown component: $1" >&2; exit 1 ;;
   esac
 }

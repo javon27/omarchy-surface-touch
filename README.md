@@ -25,6 +25,7 @@ that from scratch.
 | [`auto-rotate/`](auto-rotate/) | Accelerometer-driven display + touch rotation | no |
 | [`screensaver/`](screensaver/) | Hides OSK/trackpad and adds touch-dismiss to the screensaver | no |
 | [`lock-pin/`](lock-pin/) | Short PIN unlock (separate from your password) + on-screen keypad on the lock screen | yes (PAM/PIN file) |
+| [`touchpad-mt-fix/`](touchpad-mt-fix/) | Fixes the Type Cover trackpad silently losing two-finger scroll after suspend/resume | yes (systemd-sleep hook) |
 
 Each component is independent -- install only what you want. The
 `trackpad` injector is a shared dependency of the on-screen trackpad panel
@@ -126,6 +127,9 @@ machine:**
   `SCALE` in `auto-rotate/auto-rotate.sh`.
 - Confirm an accelerometer exists before installing `auto-rotate/`:
   `monitor-sensor --accel` should print orientation events, not silence.
+- Type Cover HID product id (only if `touchpad-mt-fix/` needs adjusting):
+  `ls /sys/bus/hid/drivers/hid-multitouch/` while the touchpad works
+  normally -- default assumes `045E:09C0`.
 
 **Order that avoids broken intermediate states:**
 1. `kernel/install-iptsd-override.sh` (safe, no dependencies)
@@ -134,8 +138,10 @@ machine:**
    `makedepends` first: `pacman -Si wvkbd-deskintl` or check
    `wvkbd/README.md`)
 3. `trackpad/install.sh` (needed before `screensaver/`)
-4. `two-finger-right-click/install.sh`, `auto-rotate/install.sh` (either
-   order, no cross-dependencies)
+4. `two-finger-right-click/install.sh`, `auto-rotate/install.sh`,
+   `touchpad-mt-fix/install.sh` (any order, no cross-dependencies --
+   `touchpad-mt-fix/` only makes sense on a device with a physical Type
+   Cover trackpad; skip it on a keyboard-less setup)
 5. `screensaver/install.sh` (after `trackpad/`)
 6. `lock-pin/install.sh` last, and only with explicit user confirmation --
    it writes to `/etc/pam.d/` and prompts interactively for a PIN. Never
@@ -167,6 +173,10 @@ machine:**
   output within ~1 second.
 - Lock-pin: lock the session and confirm the PIN pad renders and both the
   PIN and the real password unlock it, before considering this step done.
+- Touchpad MT fix: `sudo /etc/systemd/system-sleep/rebind-surface-touchpad.sh
+  post suspend` then `journalctl -t rebind-surface-touchpad` should show it
+  fired and found a device to rebind -- if it finds nothing, the product id
+  doesn't match this hardware (see the device-id note above).
 
 **When something fails**, prefer reading the relevant component's README
 over guessing -- several pieces encode non-obvious reasoning (why root
