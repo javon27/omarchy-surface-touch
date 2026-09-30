@@ -58,6 +58,12 @@ apply_orientation() {
     echo "orientation=$orientation -> transform=$transform"
     hyprctl eval "hl.monitor({ output = \"$MONITOR\", mode = \"$MODE\", position = \"$POS\", scale = $SCALE, transform = $transform })"
     hyprctl eval "hl.config({ input = { touchdevice = { transform = $transform } } })"
+    # The stylus is a separate device class: Hyprland lists the digitizer under
+    # `touch` and the pen under `tablets`, and they take separate transforms.
+    # Without this the display and finger input rotate while pen input keeps the
+    # panel's original orientation, so the pointer lands in the pre-rotation
+    # position.
+    hyprctl eval "hl.config({ input = { tablet = { transform = $transform } } })"
 }
 
 stdbuf -oL monitor-sensor --accel | while IFS= read -r line; do
