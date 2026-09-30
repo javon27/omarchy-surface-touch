@@ -75,6 +75,21 @@ KEYBOARD_USABLE=1
 `KEYBOARD_USABLE` is the derived answer most consumers want, computed once so
 every hook agrees.
 
+> **Use `KEYBOARD_USABLE`, not `TABLET_MODE`.** The raw switch means different
+> things on different hardware, because of where it lives:
+>
+> - **Surface Go**: the switch is chassis-level, so `TABLET_MODE=1` for as long
+>   as the cover is folded back.
+> - **Surface Pro 7+**: folding the cover physically USB-disconnects it, taking
+>   the switch with it. `TABLET_MODE=1` exists for about a second and then the
+>   device disappears, so it reads **0 for almost the whole time the machine is
+>   physically folded**, and fold-back is indistinguishable from detach in
+>   steady state.
+>
+> A hook keying off `TABLET_MODE` to mean "is this a tablet right now" is
+> correct on a Go and wrong on a Pro 7+. `KEYBOARD_USABLE` answers the question
+> both models actually agree on.
+
 ## Hooks
 
 Every executable in `/etc/omarchy-tablet-mode.d/` runs on each transition, with
@@ -89,6 +104,18 @@ in the environment. A hook that fails is logged and does not stop the others.
 
 Hooks run as **root**. Anything that has to be the user's own Wayland client
 needs `setpriv`; `50-onscreen-keyboard` shows the pattern.
+
+### Deferring
+
+A hook that understands the state but cannot act on it yet should exit **75**
+(`EX_TEMPFAIL`). The daemon then re-runs hooks on its next wake even though the
+hardware has not changed, and stops once none defer.
+
+That is what makes booting with the cover already folded work. The daemon starts
+before any graphical session, the keyboard hook has nowhere to draw, and logging
+in changes no hardware state — so waiting for a transition would leave you with
+no keyboard and no way to ask for one. logind touches `/dev/input` when a
+session starts, which is the wake that gets the retry.
 
 ## Choosing the keyboard
 

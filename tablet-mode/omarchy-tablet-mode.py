@@ -112,17 +112,29 @@ def publish(state):
     os.chmod(STATE_FILE, 0o644)
 
 
+# sysexits.h EX_TEMPFAIL. A hook returns this to say "I understood the state but
+# could not act on it yet" -- typically because no graphical session exists. The
+# daemon then re-runs hooks on its next wake even if the hardware has not
+# changed, which is what makes booting with the cover already folded work: the
+# first run cannot start a keyboard, and nothing about the hardware changes when
+# the user later logs in.
+EX_TEMPFAIL = 75
+
+
 def run_hooks(state):
     """Run every executable in HOOK_DIR with the state in the environment.
 
     Hooks are how anything else reacts to tablet mode: the on-screen keyboard
     is simply the first one. A hook that fails is logged and does not stop the
     others.
+
+    Returns True if any hook deferred (EX_TEMPFAIL).
     """
+    deferred = False
     try:
         names = sorted(os.listdir(HOOK_DIR))
     except FileNotFoundError:
-        return
+        return False
     env = {**os.environ, **{k: str(v) for k, v in state.items()},
            "TARGET_UID": str(TARGET_UID), "TARGET_GID": str(TARGET_GID),
            "USER_XDG_RUNTIME_DIR": RUNTIME_DIR}
@@ -132,18 +144,23 @@ def run_hooks(state):
             continue
         try:
             r = subprocess.run([path], env=env, capture_output=True, text=True, timeout=15)
-            if r.returncode != 0:
+            if r.returncode == EX_TEMPFAIL:
+                deferred = True
+                log(f"hook {name} deferred: {(r.stdout or r.stderr).strip()[:160]}")
+            elif r.returncode != 0:
                 log(f"hook {name} exited {r.returncode}: {r.stderr.strip()[:200]}")
         except Exception as exc:
             log(f"hook {name} failed: {exc}")
+    return deferred
 
 
 _last = None
+_deferred = False
 
 
 def apply(switch):
-    """Publish state, and run hooks only when it actually changes."""
-    global _last
+    """Publish state; run hooks on change, or again while one is deferred."""
+    global _last, _deferred
     tablet = read_tablet_mode(switch) if switch else False
     kbd = keyboard_attached()
     state = {
@@ -154,11 +171,17 @@ def apply(switch):
         "KEYBOARD_USABLE": int(kbd and not tablet),
     }
     publish(state)
-    if state != _last:
+    changed = state != _last
+    if changed:
         log(f"tablet={state['TABLET_MODE']} keyboard_attached={state['KEYBOARD_ATTACHED']} "
             f"keyboard_usable={state['KEYBOARD_USABLE']}")
         _last = state
-        run_hooks(state)
+    # Re-running while deferred is what covers booting with the cover already
+    # folded: the hardware never changes when the user logs in, so waiting for a
+    # state change would leave the machine with no keyboard and no way to ask
+    # for one. logind touches /dev/input at session start, which wakes us.
+    if changed or _deferred:
+        _deferred = run_hooks(state)
 
 
 def inotify_devinput():

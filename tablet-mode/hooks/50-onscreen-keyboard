@@ -41,7 +41,11 @@ running() {
 if [[ ${KEYBOARD_USABLE:-1} -eq 0 ]]; then
   running && exit 0
   sock=$(ls "$RUNTIME_DIR"/wayland-* 2>/dev/null | grep -v '\.lock$' | head -1)
-  [[ -n $sock ]] || { echo "no wayland session yet"; exit 0; }
+  # 75 (EX_TEMPFAIL) tells the daemon we understood the state but could not act:
+  # it will re-run hooks on its next wake even though the hardware has not
+  # changed. Without this, booting with the cover already folded leaves you with
+  # no keyboard, because logging in changes no hardware state.
+  [[ -n $sock ]] || { echo "no wayland session yet"; exit 75; }
   home=$(getent passwd "$TARGET_UID" | cut -d: -f6)
   setsid setpriv --reuid "$TARGET_UID" --regid "$TARGET_GID" --init-groups -- \
     env XDG_RUNTIME_DIR="$RUNTIME_DIR" \
