@@ -26,8 +26,11 @@ that from scratch.
 | [`screensaver/`](screensaver/) | Hides OSK/trackpad and adds touch-dismiss to the screensaver | yes (see note) |
 | [`lock-pin/`](lock-pin/) | Short PIN unlock (separate from your password) + on-screen keypad on the lock screen | yes (PAM/PIN file) |
 | [`touchpad-mt-fix/`](touchpad-mt-fix/) | Fixes the Type Cover trackpad silently losing two-finger scroll after suspend/resume | yes (systemd-sleep hook) |
+| [`tablet-mode/`](tablet-mode/) | Runs an on-screen keyboard only while the Type Cover is detached or folded back | yes (reads /dev/input) |
 
-Each component is independent -- install only what you want. The
+Each component is independent -- install only what you want. `tablet-mode/` is
+the one component not installed by `--all`, since it changes existing
+behaviour rather than adding to it. The
 `trackpad` injector is a shared dependency of the on-screen trackpad panel
 *and* the screensaver's touch-dismiss, so install it even if you don't
 plan to use the trackpad panel yourself.

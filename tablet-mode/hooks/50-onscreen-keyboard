@@ -1,0 +1,59 @@
+#!/bin/bash
+# Start an on-screen keyboard while the physical keyboard is unusable.
+#
+# One consumer of tablet mode among several: rotation lock or the lock screen
+# can drop their own scripts alongside this one. The daemon passes the state in
+# the environment and re-runs every hook on each transition.
+#
+#   KEYBOARD_USABLE=1  a physical keyboard is attached and not folded away
+#   KEYBOARD_USABLE=0  it is detached, or folded back behind the screen
+#   TABLET_MODE, KEYBOARD_ATTACHED   the two inputs, if a hook wants them
+#
+# Runs as root. The keyboard has to be the user's own Wayland client, so it is
+# started with setpriv under TARGET_UID.
+set -uo pipefail
+
+# Default is deliberately NOT `--hidden`. wvkbd implements virtual-keyboard-v1
+# only: it sends keystrokes and cannot listen for focus, so it has no way to
+# show itself. Starting it hidden would need SUPER+SHIFT+K to reveal -- a
+# keypress you cannot make on a machine whose keyboard just became unusable.
+#
+# squeekboard is different: it implements text-input-v3, so it starts hidden by
+# design and shows itself when a text field takes focus. Set OSK_COMMAND to
+# `squeekboard` for that behaviour.
+OSK_COMMAND="${OSK_COMMAND:-wvkbd-deskintl -l full,special --landscape-layers full,special}"
+TARGET_UID="${TARGET_UID:-1000}"
+TARGET_GID="${TARGET_GID:-$TARGET_UID}"
+RUNTIME_DIR="${USER_XDG_RUNTIME_DIR:-/run/user/$TARGET_UID}"
+
+osk_bin=$(basename "$(set -- $OSK_COMMAND; echo "$1")")
+
+running() {
+  # -x alone also matches zombies, which would report the keyboard as running
+  # forever once one is leaked.
+  local pid
+  for pid in $(pgrep -u "$TARGET_UID" -x "$osk_bin" 2>/dev/null); do
+    [[ $(awk '{print $3}' "/proc/$pid/stat" 2>/dev/null) == Z ]] || return 0
+  done
+  return 1
+}
+
+if [[ ${KEYBOARD_USABLE:-1} -eq 0 ]]; then
+  running && exit 0
+  sock=$(ls "$RUNTIME_DIR"/wayland-* 2>/dev/null | grep -v '\.lock$' | head -1)
+  # 75 (EX_TEMPFAIL) tells the daemon we understood the state but could not act:
+  # it will re-run hooks on its next wake even though the hardware has not
+  # changed. Without this, booting with the cover already folded leaves you with
+  # no keyboard, because logging in changes no hardware state.
+  [[ -n $sock ]] || { echo "no wayland session yet"; exit 75; }
+  home=$(getent passwd "$TARGET_UID" | cut -d: -f6)
+  setsid setpriv --reuid "$TARGET_UID" --regid "$TARGET_GID" --init-groups -- \
+    env XDG_RUNTIME_DIR="$RUNTIME_DIR" \
+        WAYLAND_DISPLAY="$(basename "$sock")" \
+        DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus" \
+        HOME="$home" PATH="$home/.local/bin:/usr/local/bin:/usr/bin:/bin" \
+        $OSK_COMMAND >/dev/null 2>&1 </dev/null &
+else
+  running && pkill -u "$TARGET_UID" -x "$osk_bin"
+fi
+exit 0

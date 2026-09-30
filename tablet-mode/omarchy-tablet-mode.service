@@ -1,0 +1,21 @@
+[Unit]
+Description=Publish Surface tablet-mode state and run transition hooks
+# Deliberately not ordered against the graphical session: this reads /dev/input
+# as root and must survive the compositor restarting. Hooks that need a session
+# discover it when they run, and do nothing until one exists.
+After=multi-user.target
+
+[Service]
+Type=simple
+Environment=TARGET_UID=__USER_UID__
+Environment=USER_XDG_RUNTIME_DIR=/run/user/__USER_UID__
+# Passed through to hooks. Quoted: Environment= splits on whitespace, so an
+# unquoted command with arguments is parsed as several assignments and the
+# arguments are silently dropped.
+Environment="OSK_COMMAND=wvkbd-deskintl -l full,special --landscape-layers full,special"
+ExecStart=/usr/bin/python3 __USER_HOME__/.local/bin/omarchy-tablet-mode.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

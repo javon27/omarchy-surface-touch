@@ -11,6 +11,10 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
 COMPONENTS=(kernel osk trackpad two-finger-right-click auto-rotate screensaver lock-pin touchpad-mt-fix)
+# Listed and selectable, but deliberately excluded from --all: these change
+# existing behaviour rather than adding to it.
+OPTIONAL_COMPONENTS=(tablet-mode)
+ALL_COMPONENTS=("${COMPONENTS[@]}" "${OPTIONAL_COMPONENTS[@]}")
 
 run_component() {
   case "$1" in
@@ -22,12 +26,14 @@ run_component() {
     screensaver) bash screensaver/install.sh ;;
     lock-pin) bash lock-pin/install.sh ;;
     touchpad-mt-fix) bash touchpad-mt-fix/install.sh ;;
+    tablet-mode) bash tablet-mode/install.sh ;;
     *) echo "Unknown component: $1" >&2; exit 1 ;;
   esac
 }
 
 if [[ "${1:-}" == "--list" ]]; then
   printf '%s\n' "${COMPONENTS[@]}"
+  printf '%s (not included in --all)\n' "${OPTIONAL_COMPONENTS[@]}"
   exit 0
 fi
 
@@ -43,8 +49,9 @@ fi
 
 echo "omarchy-surface-touch -- pick components to install (space-separated numbers, or 'a' for all):"
 select_list=()
-for i in "${!COMPONENTS[@]}"; do
-  echo "  $((i+1))) ${COMPONENTS[$i]}"
+for i in "${!ALL_COMPONENTS[@]}"; do
+  suffix=""; [[ " ${OPTIONAL_COMPONENTS[*]} " == *" ${ALL_COMPONENTS[$i]} "* ]] && suffix="   (not in --all)"
+  echo "  $((i+1))) ${ALL_COMPONENTS[$i]}$suffix"
 done
 read -rp "> " choice
 if [[ $choice == "a" ]]; then
@@ -52,6 +59,6 @@ if [[ $choice == "a" ]]; then
 else
   for n in $choice; do
     idx=$((n-1))
-    [[ -n "${COMPONENTS[$idx]:-}" ]] && run_component "${COMPONENTS[$idx]}"
+    [[ -n "${ALL_COMPONENTS[$idx]:-}" ]] && run_component "${ALL_COMPONENTS[$idx]}"
   done
 fi
