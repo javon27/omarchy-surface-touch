@@ -72,9 +72,11 @@ at [Quick start](#quick-start).
 Touch, panel geometry and Type Cover detection are all confirmed working on
 a Surface Go (ELAN9038 digitizer, `09B5` Type Cover) -- see
 [#5](https://github.com/javon27/omarchy-surface-touch/issues/5), verified by
-@kermes on that hardware. The one part still unconfirmed there is whether
-[`touchpad-mt-fix/`](touchpad-mt-fix/) is needed at all on ELAN models; see
-its README.
+@kermes on that hardware.
+
+[`touchpad-mt-fix/`](touchpad-mt-fix/) is worth installing on both, but for
+different reasons: the two Type Covers lose multitouch on opposite events.
+See [its README](touchpad-mt-fix/README.md).
 
 ## Surface Pen
 

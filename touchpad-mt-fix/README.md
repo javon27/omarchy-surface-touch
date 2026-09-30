@@ -13,17 +13,31 @@ resume.
 
 ## Which Type Covers this affects
 
-Seen on the `09C0` Type Cover (Surface Pro 7+). On a Surface Go's `09B5`
-cover the dropout does not appear to happen: with this hook removed entirely,
-a suspend/resume cycle left two-finger scroll working, nothing logged to
-`journalctl -t rebind-surface-touchpad`, and the sysfs instance suffix
-unchanged. So the degradation may be specific to `09C0` rather than to
-Surface Type Covers generally.
+Both, but on opposite events -- which is why each model looks like it does not
+need this component when tested only the way the other one fails.
+
+| Type Cover | suspend / resume | detach / reattach |
+|---|---|---|
+| `09C0` (Surface Pro 7+) | **loses multitouch** | survives |
+| `09B5` (Surface Go) | survives | **loses multitouch** |
+
+Measured both ways. On a Pro 7+, a detach and reattach left the touchpad
+reporting `ABS_MT_SLOT` with slots 0-4, and a live capture during two-finger
+scrolling saw 17 contacts with 2 simultaneous -- multitouch intact, no rebind
+run. On a Go, removing this hook entirely and suspending left two-finger
+scroll working, while a physical detach and reattach killed it outright (zero
+events at evdev level) until the hook was run by hand. Both reported in
+[#5](https://github.com/javon27/omarchy-surface-touch/issues/5).
+
+**The hook only covers the resume half.** It lives in
+`/etc/systemd/system-sleep/`, so nothing rebinds on a detach and reattach --
+which is precisely the case a `09B5` needs. A udev rule on `add` for `045E`
+would close that; see
+[#18](https://github.com/javon27/omarchy-surface-touch/issues/18).
 
 The hook matches the Microsoft vendor id, so it installs and matches on both.
-Installing it where it isn't needed costs nothing -- it only rebinds on
-resume, and rebinding a healthy device is harmless. Reported in
-[#5](https://github.com/javon27/omarchy-surface-touch/issues/5).
+Installing it where its half is not needed costs nothing -- rebinding a
+healthy device is harmless.
 
 ## Fix
 
