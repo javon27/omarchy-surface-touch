@@ -12,6 +12,7 @@ window class org.omarchy.screensaver) is up:
 """
 import glob
 import os
+import select
 import socket
 import subprocess
 import threading
@@ -29,6 +30,26 @@ RUNTIME_DIR = os.environ.get("USER_XDG_RUNTIME_DIR", "/run/user/1000")
 TARGET_UID = os.environ.get("TARGET_UID")
 OSK_STATE_FILE = "/tmp/osk-visible"
 TRACKPAD_MARKER = "omarchy/trackpad/shell.qml"
+
+# Devices this project creates through uinput. Watching them would let the
+# on-screen trackpad panel dismiss the screensaver it is hidden behind, and
+# risks a loop with the very injector this helper sends Escape through.
+OWN_UINPUT_NAMES = {"virtual-trackpad", "two-finger-right-click"}
+
+# How far a pointer must travel before it counts as deliberate. A palm resting
+# on the touchpad or a jittery sensor should not dismiss the screensaver; a
+# jiggle should. Expressed in millimetres because absolute devices report a
+# resolution in units/mm (20 on a Surface Type Cover).
+POINTER_MOVE_MM = float(os.environ.get("POINTER_MOVE_MM", "5.0"))
+# Relative devices report arbitrary counts with no physical scale.
+REL_MOVE_COUNTS = int(os.environ.get("REL_MOVE_COUNTS", "25"))
+CLICK_BUTTONS = {e.BTN_LEFT, e.BTN_RIGHT, e.BTN_MIDDLE}
+# How long to wait before noticing a mouse that was plugged in later.
+RESCAN_SECONDS = 2.0
+# The screensaver takes a moment to exit after the first Escape. Without a
+# guard, continued motion keeps injecting Escape, and those extra presses land
+# in whatever application the screensaver was covering.
+DISMISS_COOLDOWN = 1.5
 
 
 def log(msg):
@@ -194,14 +215,182 @@ def wait_for_touch_device():
         time.sleep(2)
 
 
+# Updated once a second by poll_screensaver_state(). screensaver_active() shells
+# out to pgrep, which is far too expensive to call per input event -- the
+# pointer watcher wakes on every movement the touchpad reports.
+_screensaver_active = False
+
+
 def poll_screensaver_state():
+    global _screensaver_active
     was_active = False
     while True:
         active = screensaver_active()
+        _screensaver_active = active
         if active and not was_active:
             hide_osk_and_trackpad()
         was_active = active
         time.sleep(1)
+
+
+def _pointer_devices():
+    """Pointing devices that are not the touchscreen: touchpads and mice.
+
+    The mirror of _multitouch_devices(). INPUT_PROP_DIRECT means the surface you
+    touch is the display itself, so excluding it drops the touchscreen and the
+    stylus -- the stylus also reports INPUT_PROP_POINTER and would otherwise
+    match here.
+    """
+    found = []
+    for path in evdev.list_devices():
+        try:
+            d = evdev.InputDevice(path)
+        except OSError:
+            continue
+        if d.name in OWN_UINPUT_NAMES:
+            continue
+        try:
+            if e.INPUT_PROP_DIRECT in d.input_props():
+                continue
+        except Exception:
+            pass
+        caps = d.capabilities()
+        rel = set(caps.get(e.EV_REL) or [])
+        keys = set(caps.get(e.EV_KEY) or [])
+        abs_codes = {c for c, _ in (caps.get(e.EV_ABS) or [])}
+        try:
+            props = set(d.input_props())
+        except Exception:
+            props = set()
+        is_mouse = {e.REL_X, e.REL_Y} <= rel
+        # Absolute axes alone are not enough: the raw uncalibrated touchscreen
+        # HID node reports ABS_X/ABS_Y with no INPUT_PROP at all, so it looks
+        # like a touchpad here even though INPUT_PROP_DIRECT never appears on
+        # it. A real indirect pointing device carries INPUT_PROP_POINTER, or at
+        # minimum a left button; that node carries neither.
+        is_touchpad = bool({e.ABS_MT_POSITION_X, e.ABS_X} & abs_codes) and (
+            e.INPUT_PROP_POINTER in props or e.BTN_LEFT in keys)
+        if is_mouse or is_touchpad:
+            found.append(d)
+    return found
+
+
+def _move_threshold(dev):
+    """Motion counting as deliberate, in this device's own units."""
+    absinfo = dict(dev.capabilities(absinfo=True).get(e.EV_ABS) or [])
+    for code in (e.ABS_MT_POSITION_X, e.ABS_X):
+        info = absinfo.get(code)
+        if info is None:
+            continue
+        if info.resolution:
+            return POINTER_MOVE_MM * info.resolution
+        return max(1, (info.max - info.min) * 0.02)   # 2% of travel if unscaled
+    return REL_MOVE_COUNTS
+
+
+def watch_pointers_for_dismiss():
+    """Dismiss the screensaver on deliberate trackpad or mouse input.
+
+    omarchy-screensaver exits on a byte reaching its pty or on losing focus.
+    Pointer motion and clicks produce neither -- a fullscreen window that is
+    already focused stays focused, and nothing writes to the terminal -- so, as
+    with touch, nothing happens unless a keypress is injected.
+
+    Devices are rescanned periodically so a mouse plugged in after the helper
+    started is picked up, and so a detached Type Cover stops being polled.
+    """
+    devs, thresh, moved, lastpos = {}, {}, {}, {}
+    known = None
+    last_dismiss = 0.0
+
+    def dismiss(dev, why):
+        """Send Escape once, then stay quiet while the screensaver goes away."""
+        nonlocal last_dismiss
+        now = time.time()
+        for fd in moved:
+            moved[fd] = 0.0
+            lastpos[fd] = {}
+        if now - last_dismiss < DISMISS_COOLDOWN:
+            return
+        if not screensaver_active():      # confirm before injecting a keypress
+            return
+        last_dismiss = now
+        log(f"{dev.name!r} {why} during screensaver -- dismissing")
+        send_injector("KEY esc")
+
+    def rescan():
+        nonlocal known
+        paths = set(evdev.list_devices())
+        if paths == known:
+            return
+        known = paths
+        for fd in list(devs):
+            if devs[fd].path not in paths:
+                # Close it: a Surface Type Cover is detached and reattached
+                # often enough that leaked descriptors would accumulate.
+                try:
+                    devs[fd].close()
+                except Exception:
+                    pass
+                devs.pop(fd, None); thresh.pop(fd, None)
+                moved.pop(fd, None); lastpos.pop(fd, None)
+        have = {d.path for d in devs.values()}
+        for d in _pointer_devices():
+            if d.path in have:
+                continue
+            devs[d.fd] = d
+            thresh[d.fd] = _move_threshold(d)
+            moved[d.fd] = 0.0
+            lastpos[d.fd] = {}
+            log(f"watching pointer {d.name!r} ({d.path}), "
+                f"move threshold {thresh[d.fd]:.0f} units")
+
+    rescan()
+    if not devs:
+        log("no pointer devices found; trackpad/mouse dismiss inactive")
+
+    while True:
+        try:
+            ready, _, _ = select.select(list(devs), [], [], RESCAN_SECONDS)
+        except (OSError, ValueError):
+            rescan()
+            continue
+        if not ready:
+            rescan()
+            continue
+
+        # Cheap gate: the cached flag costs nothing, and the exact check only
+        # runs at the moment we would actually inject a keypress.
+        active = _screensaver_active
+        for fd in ready:
+            dev = devs.get(fd)
+            if dev is None:
+                continue
+            try:
+                events = list(dev.read())
+            except OSError:
+                rescan()
+                continue
+            if not active:
+                # Motion before the screensaver appeared must not carry over.
+                moved[fd] = 0.0
+                lastpos[fd] = {}
+                continue
+            for ev in events:
+                if ev.type == e.EV_KEY and ev.code in CLICK_BUTTONS and ev.value == 1:
+                    dismiss(dev, "click")
+                    break
+                if ev.type == e.EV_REL and ev.code in (e.REL_X, e.REL_Y):
+                    moved[fd] += abs(ev.value)
+                elif ev.type == e.EV_ABS and ev.code in (
+                        e.ABS_MT_POSITION_X, e.ABS_MT_POSITION_Y, e.ABS_X, e.ABS_Y):
+                    prev = lastpos[fd].get(ev.code)
+                    lastpos[fd][ev.code] = ev.value
+                    if prev is not None:
+                        moved[fd] += abs(ev.value - prev)
+                if moved[fd] >= thresh[fd]:
+                    dismiss(dev, "moved")
+                    break
 
 
 def watch_touch_for_dismiss():
@@ -216,6 +405,7 @@ def watch_touch_for_dismiss():
 
 def main():
     threading.Thread(target=poll_screensaver_state, daemon=True).start()
+    threading.Thread(target=watch_pointers_for_dismiss, daemon=True).start()
     watch_touch_for_dismiss()
 
 
