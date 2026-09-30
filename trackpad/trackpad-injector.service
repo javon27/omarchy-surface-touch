@@ -4,6 +4,8 @@ After=multi-user.target
 
 [Service]
 Type=simple
+# The uid allowed to drive the injector. Rendered at install time.
+Environment=TARGET_UID=__USER_UID__
 ExecStart=/usr/bin/python3 __USER_HOME__/.local/bin/trackpad-injector.py
 Restart=always
 RestartSec=1
