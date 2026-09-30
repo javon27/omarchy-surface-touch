@@ -48,6 +48,24 @@ this helper sends `Escape` through.
 > The name is now a misnomer -- it handles more than touch. Renaming the unit
 > would break every existing install for no functional gain, so it stays.
 
+### It reads devices below the compositor
+
+This watches `/dev/input` directly, as root, which is below the level
+Hyprland's per-device settings apply at. A pointer you have turned off with
+`hl.device({ name = "...", enabled = false })` in `input.lua` is still read
+here, and the `Escape` it causes to be injected *is* input the compositor
+sees -- so it resets the idle timer and pushes back the lock.
+
+Nothing on a stock setup is affected: the devices disabled by default are the
+raw uncalibrated touchscreen nodes, and those are excluded anyway for carrying
+neither `INPUT_PROP_POINTER` nor a left button. But if you disable a flaky
+trackpad expecting it to stop doing things, this is the one place it still
+will.
+
+The injector socket this depends on is world-writable, which is its own
+problem and not this component's --
+[#22](https://github.com/javon27/omarchy-surface-touch/issues/22).
+
 ## Install
 
 ```
