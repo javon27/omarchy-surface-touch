@@ -74,9 +74,12 @@ a Surface Go (ELAN9038 digitizer, `09B5` Type Cover) -- see
 [#5](https://github.com/javon27/omarchy-surface-touch/issues/5), verified by
 @kermes on that hardware.
 
-[`touchpad-mt-fix/`](touchpad-mt-fix/) is worth installing on both, but for
-different reasons: the two Type Covers lose multitouch on opposite events.
-See [its README](touchpad-mt-fix/README.md).
+[`touchpad-mt-fix/`](touchpad-mt-fix/) addresses a `09C0` Type Cover losing
+two-finger scroll after suspend/resume, which is measured. Whether any cover
+needs it for a physical detach is unresolved -- see
+[its README](touchpad-mt-fix/README.md) and
+[#18](https://github.com/javon27/omarchy-surface-touch/issues/18). Installing
+it where it is not needed is harmless.
 
 ## Surface Pen
 
