@@ -8,7 +8,8 @@ position, no hover, awkward for small targets).
 ## Pieces
 
 - **`trackpad-injector.py`** -- runs as root (needs `/dev/uinput`), listens
-  on `/run/trackpad.sock` for plain-text commands (`MOVE dx dy`,
+  on `/run/trackpad.sock` (mode `0600`, owned by the session user; see
+  [Who may connect](#who-may-connect)) for plain-text commands (`MOVE dx dy`,
   `SCROLL dx dy`, `CLICK left|right|middle`, `DOWN`/`UP` for
   click-and-drag, `KEY esc`/`KEY space`), and injects them through a real
   virtual mouse+keyboard device. Every app sees identical events to a
@@ -47,3 +48,25 @@ Bind a key to `omarchy-toggle-trackpad` -- see
 the injector socket -- so it should work unmodified on any screen size.
 Panel size/position on first launch, drag sensitivity, and colors are all
 plain QML properties near the top of the file if you want to tweak feel.
+
+## Who may connect
+
+The injector runs as root and writes to `/dev/uinput`, so anything that reaches
+its socket can synthesize pointer motion and clicks into the session, including
+clicks on the lock screen's own PIN keypad. Access is therefore restricted to
+the session the injector belongs to, in two independent ways:
+
+- the socket is created `0600` and chowned to `TARGET_UID`, which the unit
+  renders at install time
+- every accepted connection is checked with `SO_PEERCRED`, and any peer that is
+  neither `TARGET_UID` nor root is closed and logged
+
+The second check does not depend on the first being right, which matters because
+file ownership is set once at install time and the peer check is evaluated on
+every connection.
+
+Root is allowed because `screensaver-touch-helper` is a root system unit and is
+the injector's other client.
+
+If you see `refused connection from uid N` in `journalctl -u trackpad-injector`,
+something outside your session tried to drive the pointer.
