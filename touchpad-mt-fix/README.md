@@ -13,31 +13,38 @@ resume.
 
 ## Which Type Covers this affects
 
-Both, but on opposite events -- which is why each model looks like it does not
-need this component when tested only the way the other one fails.
+Confirmed on the `09C0` Type Cover (Surface Pro 7+), after suspend/resume.
+That is the case this component exists for and it is measured.
 
-| Type Cover | suspend / resume | detach / reattach |
-|---|---|---|
-| `09C0` (Surface Pro 7+) | **loses multitouch** | survives |
-| `09B5` (Surface Go) | survives | **loses multitouch** |
+**What is not established is whether any cover loses multitouch on a physical
+detach and reattach.** An earlier version of this README claimed a Surface Go's
+`09B5` did, and that `09B5` survives suspend while `09C0` does not -- a tidy
+mirrored table. The `09B5` half has since been withdrawn by the reporter
+([#18](https://github.com/javon27/omarchy-surface-touch/issues/18)) after
+checking their own journal: three detach/reattach cycles across two kernels all
+rebound to `hid-multitouch` unaided, and the boot in which a manual rebind was
+cited as the fix contains no detach at all.
 
-Measured both ways. On a Pro 7+, a detach and reattach left the touchpad
-reporting `ABS_MT_SLOT` with slots 0-4, and a live capture during two-finger
-scrolling saw 17 contacts with 2 simultaneous -- multitouch intact, no rebind
-run. On a Go, removing this hook entirely and suspending left two-finger
-scroll working, while a physical detach and reattach killed it outright (zero
-events at evdev level) until the hook was run by hand. Both reported in
-[#5](https://github.com/javon27/omarchy-surface-touch/issues/5).
+A real and useful finding came out of that, though, because it explains how the
+mistake was made. The log looks different at boot than on hotplug:
 
-**The hook only covers the resume half.** It lives in
-`/etc/systemd/system-sleep/`, so nothing rebinds on a detach and reattach --
-which is precisely the case a `09B5` needs. A udev rule on `add` for `045E`
-would close that; see
-[#18](https://github.com/javon27/omarchy-surface-touch/issues/18).
+```
+# at boot -- two lines, because hid-multitouch is not loaded yet
+hid-generic    0003:045E:09B5.0004: ... Mouse [Microsoft Surface Keyboard]
+hid-multitouch 0003:045E:09B5.0004: ... Mouse [Microsoft Surface Keyboard]
 
-The hook matches the Microsoft vendor id, so it installs and matches on both.
-Installing it where its half is not needed costs nothing -- rebinding a
-healthy device is harmless.
+# on hotplug -- one line, because hid-multitouch is already resident
+hid-multitouch 0003:045E:09B5.000B: ... Mouse [Microsoft Surface Keyboard]
+```
+
+At boot `hid-generic` claims the device first and the rebind follows once udev
+loads the module. On a reattach the correct driver binds immediately. A single
+line therefore means the rebind was never *needed*, not that it never happened
+-- which reads exactly backwards.
+
+So: install this if you have a `09C0` and lose two-finger scroll after
+suspend. Whether anything needs it for detach is open, and the hook does not
+cover that case anyway, since it is a `systemd-sleep` hook.
 
 ## Fix
 
