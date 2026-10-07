@@ -9,6 +9,9 @@ Environment=TARGET_UID=__USER_UID__
 ExecStart=/usr/bin/python3 __USER_HOME__/.local/bin/trackpad-injector.py
 Restart=always
 RestartSec=1
+# EX_CONFIG from the injector: no safe uid to restrict the socket to.
+# Restarting cannot fix that, and looping on it hides the message.
+RestartPreventExitStatus=78
 
 [Install]
 WantedBy=multi-user.target
