@@ -13,7 +13,8 @@ Environment=USER_XDG_RUNTIME_DIR=/run/user/__USER_UID__
 # unquoted command with arguments is parsed as several assignments and the
 # arguments are silently dropped.
 Environment="OSK_COMMAND=wvkbd-deskintl -l full,special --landscape-layers full,special"
-ExecStart=/usr/bin/python3 __USER_HOME__/.local/bin/omarchy-tablet-mode.py
+# Root-owned path and -I: see ROOT_LIBDIR in lib.sh.
+ExecStart=/usr/bin/python3 -I __ROOT_LIBDIR__/omarchy-tablet-mode.py
 Restart=always
 RestartSec=2
 

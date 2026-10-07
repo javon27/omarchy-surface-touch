@@ -151,21 +151,32 @@ yay -S libpam_pwdfile          # lock-pin only, AUR
 
 ## Why some of this needs root
 
-`two-finger-right-click` and `trackpad-injector` both read a raw touch input
-device and/or create a `/dev/uinput` virtual device. The straightforward way
-to grant that without root is a udev rule adding the invoking user to the
-`input`/`uinput` group -- this repo instead runs them as root system
-services, which is simpler to install correctly across different distros
-but is a real tradeoff (a bug in either script runs with root privileges).
-If you'd rather set up udev rules and run them as your own user, the scripts
-themselves need no changes -- only the systemd units would move from system
-to user scope.
+The components marked "yes" in the table above read raw input devices, create
+a `/dev/uinput` virtual device, or rebind a HID driver -- none of which an
+ordinary user can do. The usual alternative is a udev rule putting your user
+in the `input`/`uinput` groups; this repo runs them as root system services
+instead, because that installs the same way everywhere. It is a real tradeoff:
+a bug in one of those scripts runs as root.
 
-`screensaver` gets this backwards today: it reads the touchscreen the same
-way those two do, but installs as a *user* unit, so it cannot open
-`/dev/input/event*` and its touch-dismiss half has never worked. It needs
-moving to a system unit -- see
-[`screensaver/README.md`](screensaver/README.md).
+So root-run code here follows three rules:
+
+- **Nothing root runs lives anywhere a regular user can write.** Scripts are
+  installed root-owned to `/usr/local/lib/omarchy-surface-touch/` (the
+  touchpad rebind to `/usr/local/bin/`), never `~/.local/bin`. A root service
+  executing a file the user can rewrite hands that user root at the next
+  restart -- and for Python, so does a writable *directory*, because the
+  script's own directory is first on `sys.path` and a module dropped beside it
+  is imported in place of the real one.
+- **Python runs with `-I`**, which keeps the script's directory, user
+  site-packages and `PYTHON*` variables out of the interpreter even so.
+- **Work done in your session runs as you, not as root.** The helpers locate
+  your compositor by looking in your runtime directory, which you control, so
+  `hyprctl` is started as the session user. Run as root, a symlink planted
+  there would make root connect to any socket on the machine, since root's
+  `connect()` ignores socket permissions.
+
+If you would rather run these as your own user with udev rules, the scripts
+need no changes -- only the units would move from system to user scope.
 
 ## Contributing
 
