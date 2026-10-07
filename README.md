@@ -25,7 +25,7 @@ that from scratch.
 | [`auto-rotate/`](auto-rotate/) | Accelerometer-driven display + touch rotation | no |
 | [`screensaver/`](screensaver/) | Hides OSK/trackpad and adds touch-dismiss to the screensaver | yes (see note) |
 | [`lock-pin/`](lock-pin/) | Short PIN unlock (separate from your password) + on-screen keypad on the lock screen | yes (PAM/PIN file) |
-| [`touchpad-mt-fix/`](touchpad-mt-fix/) | Fixes the Type Cover trackpad silently losing two-finger scroll after suspend/resume | yes (systemd-sleep hook) |
+| [`touchpad-mt-fix/`](touchpad-mt-fix/) | Rebinds the Type Cover touchpad after resume, at boot and on attach, clearing multitouch dropping out or the pointer going silent | yes (root service + udev rule) |
 | [`tablet-mode/`](tablet-mode/) | Runs an on-screen keyboard only while the Type Cover is detached or folded back | yes (reads /dev/input) |
 
 Each component is independent -- install only what you want. `tablet-mode/` is
@@ -46,7 +46,7 @@ Pro 7 should need the exact same setup.
 Most device-specific values are now detected at runtime rather than
 hardcoded: `auto-rotate` reads the panel's output/mode/position/scale from
 `hyprctl monitors -j`, the touchscreen is located by capability
-(`INPUT_PROP_DIRECT`) rather than by device name, and the Type Cover sleep hook
+(`INPUT_PROP_DIRECT`) rather than by device name, and the Type Cover rebind
 matches the Microsoft vendor id rather than one model's product id. Each is
 still overridable -- see the component READMEs. What remains genuinely
 model-dependent:
@@ -74,10 +74,10 @@ a Surface Go (ELAN9038 digitizer, `09B5` Type Cover) -- see
 [#5](https://github.com/javon27/omarchy-surface-touch/issues/5), verified by
 @kermes on that hardware.
 
-[`touchpad-mt-fix/`](touchpad-mt-fix/) addresses a `09C0` Type Cover losing
-two-finger scroll after suspend/resume, which is measured. Whether any cover
-needs it for a physical detach is unresolved -- see
-[its README](touchpad-mt-fix/README.md) and
+[`touchpad-mt-fix/`](touchpad-mt-fix/) clears two measured touchpad failures:
+a `09C0` losing multitouch after resume, and a `09B5` whose pointer interface
+went silent with no suspend or detach involved. It rebinds after resume, at
+boot and on attach -- see [its README](touchpad-mt-fix/README.md) and
 [#18](https://github.com/javon27/omarchy-surface-touch/issues/18). Installing
 it where it is not needed is harmless.
 
@@ -210,13 +210,11 @@ machine:**
   `evtest` -- look for something like `IPTSD Virtual Touchscreen XXXX:XXXX`.
   Needed for `TOUCH_DEVICE_NAME` in `two-finger-right-click/` and
   `screensaver/`.
-- Monitor name/mode/scale: `hyprctl monitors`. Needed for `MONITOR`/`MODE`/
-  `SCALE` in `auto-rotate/auto-rotate.sh`.
+- Monitor name/mode/scale are detected by `auto-rotate` at startup; only set
+  `ROTATE_MONITOR`/`ROTATE_MODE`/`ROTATE_POS`/`ROTATE_SCALE` if it picks the
+  wrong output (`hyprctl monitors` shows the candidates).
 - Confirm an accelerometer exists before installing `auto-rotate/`:
   `monitor-sensor --accel` should print orientation events, not silence.
-- Type Cover HID product id (only if `touchpad-mt-fix/` needs adjusting):
-  `ls /sys/bus/hid/drivers/hid-multitouch/` while the touchpad works
-  normally -- default assumes `045E:09C0`.
 
 **Order that avoids broken intermediate states:**
 1. `kernel/install-iptsd-override.sh` (safe, no dependencies)
@@ -260,10 +258,10 @@ machine:**
   output within ~1 second.
 - Lock-pin: lock the session and confirm the PIN pad renders and both the
   PIN and the real password unlock it, before considering this step done.
-- Touchpad MT fix: `sudo /etc/systemd/system-sleep/rebind-surface-touchpad.sh
-  post suspend` then `journalctl -t rebind-surface-touchpad` should show it
-  fired and found a device to rebind -- if it finds nothing, the product id
-  doesn't match this hardware (see the device-id note above).
+- Touchpad MT fix: `sudo systemctl start rebind-surface-touchpad.service`,
+  then after ~5s `journalctl -t rebind-surface-touchpad` should show
+  `rebinding 0003:045E:...`. `no Type Cover bound to hid-multitouch` means the
+  cover is detached or not on that driver.
 
 **When something fails**, prefer reading the relevant component's README
 over guessing -- several pieces encode non-obvious reasoning (why root

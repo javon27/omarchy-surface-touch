@@ -1,7 +1,8 @@
 #!/bin/bash
-# Installs a systemd-sleep hook that re-inits the Type Cover touchpad's
-# multitouch mode on every resume from suspend. See README.md for the
-# symptom this fixes and why it happens.
+# Installs a oneshot service that rebinds the Type Cover touchpad's
+# hid-multitouch device after resume, at boot, and when the cover is attached,
+# each after a short settle delay. See README.md for the symptom and why all
+# three triggers are needed.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 source ../lib.sh
@@ -23,10 +24,29 @@ if ! ls /sys/bus/hid/drivers/hid-multitouch/0003:045E:*.* >/dev/null 2>&1; then
   fi
 fi
 
-# -D: systemd ships /usr/lib/systemd/system-sleep/ but not the /etc one, so on
-# a default Arch install this target directory does not exist yet.
-sudo install -Dm 755 rebind-surface-touchpad.sh /etc/systemd/system-sleep/rebind-surface-touchpad.sh
-info "Installed /etc/systemd/system-sleep/rebind-surface-touchpad.sh"
-info "Takes effect on the next suspend/resume -- no service to enable or reload."
-info "Test it immediately with: sudo /etc/systemd/system-sleep/rebind-surface-touchpad.sh post suspend"
-info "Check it fired after a real resume with: journalctl -t rebind-surface-touchpad"
+# Root-owned location on purpose. A root service must not execute anything a
+# non-root user can rewrite, or that user can turn it into root code execution.
+sudo install -Dm 755 -o root -g root rebind-surface-touchpad.sh /usr/local/bin/rebind-surface-touchpad
+info "Installed /usr/local/bin/rebind-surface-touchpad"
+
+install_system_unit rebind-surface-touchpad.service
+sudo install -Dm 644 99-surface-touchpad.rules /etc/udev/rules.d/99-surface-touchpad.rules
+info "Installed /etc/udev/rules.d/99-surface-touchpad.rules"
+
+# Earlier versions installed a hook here. systemd-sleep only runs executables
+# from /usr/lib/systemd/system-sleep/, so it never fired on a real resume --
+# and leaving it behind would suggest otherwise to anyone reading the system.
+old=/etc/systemd/system-sleep/rebind-surface-touchpad.sh
+if [[ -e $old ]]; then
+  sudo rm -f "$old"
+  info "Removed $old (never ran: systemd-sleep does not read /etc/systemd/system-sleep/)"
+fi
+
+sudo systemctl daemon-reload
+sudo systemctl enable rebind-surface-touchpad.service
+sudo udevadm control --reload
+
+info "Enabled. Fires after resume, at boot, and when the Type Cover is attached."
+info "Not run now: a rebind briefly drops the keyboard, so it would interrupt this install."
+info "Test it with: sudo systemctl start rebind-surface-touchpad.service   (keyboard blips ~5s later)"
+info "Every run is logged, including no-ops: journalctl -t rebind-surface-touchpad"

@@ -1,0 +1,8 @@
+# Rebind the Surface Type Cover touchpad when the cover is attached, and at
+# boot -- udev coldplug replays existing devices with ACTION=add, so one rule
+# covers both.
+#
+# Matches the USB device rather than its HID interface on purpose: the rebind
+# itself emits HID and input uevents, and matching those would re-trigger it.
+# A rebind never re-adds the USB device, so this cannot loop.
+ACTION=="add", SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="045e", TAG+="systemd", ENV{SYSTEMD_WANTS}+="rebind-surface-touchpad.service"

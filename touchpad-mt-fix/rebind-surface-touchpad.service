@@ -1,0 +1,23 @@
+[Unit]
+Description=Re-init the Surface Type Cover touchpad (hid-multitouch rebind)
+# Three triggers request this one unit, so triggers that land together -- a
+# resume that also re-enumerates the cover, say -- collapse into one rebind
+# instead of blipping the keyboard twice:
+#   - after resume, via WantedBy= the sleep targets below
+#   - at boot and on Type Cover attach, via 99-surface-touchpad.rules
+#
+# This replaces a hook in /etc/systemd/system-sleep/. systemd-sleep only runs
+# executables from /usr/lib/systemd/system-sleep/, so that hook never fired on
+# a real resume.
+After=suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target
+
+[Service]
+Type=oneshot
+# Every trigger is a (re-)enumeration of the cover or follows one. Rebinding
+# at once can race the device exactly as the original bind may have, so give
+# it time to settle first.
+ExecStartPre=/usr/bin/sleep 5
+ExecStart=/usr/local/bin/rebind-surface-touchpad
+
+[Install]
+WantedBy=suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target
