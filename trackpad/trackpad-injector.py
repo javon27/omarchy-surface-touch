@@ -30,6 +30,11 @@ SOCKET_PATH = "/run/trackpad.sock"
 # struct ucred: pid, uid, gid, as returned by SO_PEERCRED.
 _UCRED = struct.Struct("3i")
 
+# sysexits.h EX_CONFIG. The unit sets RestartPreventExitStatus to this, so a
+# misconfiguration fails once and stays failed instead of restart-looping
+# until systemd's start limit trips. Restarting cannot fix a missing setting.
+EX_CONFIG = 78
+
 BUTTONS = {"left": e.BTN_LEFT, "right": e.BTN_RIGHT, "middle": e.BTN_MIDDLE}
 KEYS = {"esc": e.KEY_ESC, "space": e.KEY_SPACE}
 
@@ -64,10 +69,12 @@ def allowed_uids():
         uid = uids.pop()
         log(f"TARGET_UID unset, using uid {uid} from /run/user; re-run trackpad/install.sh")
         return {0, uid}
-    raise SystemExit(
-        "TARGET_UID is not set and the session uid is ambiguous. "
+    log(
+        f"TARGET_UID is not set and /run/user is ambiguous ({sorted(uids) or 'empty'}), "
+        "so there is no safe uid to restrict the socket to. "
         "Re-run trackpad/install.sh to reinstall the unit."
     )
+    raise SystemExit(EX_CONFIG)
 
 
 def peer_uid(conn):
