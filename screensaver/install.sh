@@ -15,7 +15,7 @@ if ! systemctl is-active --quiet trackpad-injector.service 2>/dev/null; then
   warn "trackpad-injector.service isn't running yet -- install ../trackpad/ first (dismiss-by-touch needs it)."
 fi
 
-install_bin screensaver-touch-helper.py
+install_root_bin screensaver-touch-helper.py
 
 # Earlier versions installed this as a user unit, where it could never read the
 # touchscreen. Clear that out first, or the stale copy keeps running alongside

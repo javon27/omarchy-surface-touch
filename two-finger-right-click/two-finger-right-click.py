@@ -13,6 +13,7 @@ click would land wherever a physical mouse/trackpad last parked it instead.
 import glob
 import json
 import os
+import pwd
 import subprocess
 import time
 
@@ -26,6 +27,25 @@ MOVE_FUZZ_PERCENT = float(os.environ.get("MOVE_FUZZ_PERCENT", "3.0"))
 
 RUNTIME_DIR = os.environ.get("USER_XDG_RUNTIME_DIR", "/run/user/1000")
 
+
+def _session_ids():
+    """(uid, gid) of the session user, or None if it cannot be determined.
+
+    Used to run hyprctl as that user instead of as root. The instance is
+    located by globbing the user's runtime dir, which the user controls: a
+    symlinked .socket.sock there would otherwise make root connect() -- which
+    bypasses socket permissions -- to any unix socket on the machine. As the
+    session user, hyprctl can only reach what that user could reach anyway.
+    """
+    raw = os.environ.get("TARGET_UID") or os.path.basename(RUNTIME_DIR.rstrip("/"))
+    if not raw.isdigit() or int(raw) == 0:
+        return None
+    uid = int(raw)
+    try:
+        return uid, pwd.getpwuid(uid).pw_gid
+    except KeyError:
+        return None
+
 # Apps that already have their own native two-finger-tap-to-context-menu (or
 # similar) touch gesture. Firing our own synthetic right-click on top of
 # theirs races against it -- whichever one opens a menu second ends up
@@ -38,12 +58,16 @@ NATIVE_GESTURE_APPS = [
 
 
 def get_active_window_class():
+    ids = _session_ids()
+    if ids is None:
+        return None
     for sock_dir in glob.glob(f"{RUNTIME_DIR}/hypr/*"):
         sig = os.path.basename(sock_dir)
         try:
             out = subprocess.run(
                 ["hyprctl", "-j", "activewindow"],
                 env={**os.environ, "HYPRLAND_INSTANCE_SIGNATURE": sig, "XDG_RUNTIME_DIR": RUNTIME_DIR},
+                user=ids[0], group=ids[1], extra_groups=[],
                 capture_output=True, text=True, timeout=1,
             )
             data = json.loads(out.stdout)

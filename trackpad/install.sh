@@ -11,7 +11,7 @@ require_cmd python3
 require_cmd quickshell "Install with: sudo pacman -S quickshell (Omarchy ships this already; on plain Arch: yay -S quickshell)"
 python3 -c "import evdev" 2>/dev/null || die "python-evdev is required. Install with: sudo pacman -S python-evdev"
 
-install_bin trackpad-injector.py
+install_root_bin trackpad-injector.py
 install_system_unit trackpad-injector.service
 
 mkdir -p "$HOME/.config/omarchy/trackpad"

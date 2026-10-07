@@ -10,7 +10,7 @@ source ../lib.sh
 require_cmd python3
 python3 -c "import evdev" 2>/dev/null || die "python-evdev is required. Install with: sudo pacman -S python-evdev"
 
-install_bin two-finger-right-click.py
+install_root_bin two-finger-right-click.py
 install_system_unit two-finger-rightclick.service
 
 sudo systemctl daemon-reload

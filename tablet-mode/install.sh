@@ -30,7 +30,7 @@ then
   warn "simply not be readable as your user."
 fi
 
-install_bin omarchy-tablet-mode.py
+install_root_bin omarchy-tablet-mode.py
 install_system_unit omarchy-tablet-mode.service
 
 # Hooks are how anything else consumes tablet mode. The on-screen keyboard is
